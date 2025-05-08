@@ -1750,6 +1750,34 @@ class TranscriptorMultilingue:
     def transcribir_archivo_grande(self, archivo_audio, modo):
         """Transcribe un archivo de audio grande dividiéndolo en segmentos"""
         try:
+            # Verificar la extensión del archivo
+            extension = os.path.splitext(archivo_audio)[1].lower()
+            
+            # Si no es un archivo WAV, intentar convertirlo
+            if extension != '.wav':
+                if pydub_disponible:
+                    self.root.after(0, lambda: self.estado_var.set(f"Convirtiendo archivo {extension} a WAV..."))
+                    
+                    # Crear un archivo temporal
+                    temp_wav = tempfile.NamedTemporaryFile(suffix='.wav', delete=False).name
+                    
+                    # Convertir el archivo al formato WAV
+                    try:
+                        sound = AudioSegment.from_file(archivo_audio)
+                        sound.export(temp_wav, format="wav")
+                        archivo_audio = temp_wav  # Usar el archivo WAV temporal
+                        self.root.after(0, lambda: self.estado_var.set("Archivo convertido, procesando..."))
+                    except Exception as e:
+                        print(f"Error al convertir archivo: {e}")
+                        self.root.after(0, lambda: self.estado_var.set(f"Error al convertir archivo: {str(e)}"))
+                        messagebox.showerror("Error", f"Error al convertir archivo: {str(e)}")
+                        return
+                else:
+                    messagebox.showerror("Error", 
+                                f"No se puede procesar archivos {extension}. Instale pydub: pip install pydub")
+                    return
+            
+            # Continuar con el procesamiento del archivo WAV
             with wave.open(archivo_audio, 'rb') as wf:
                 canales = wf.getnchannels()
                 tasa = wf.getframerate()
@@ -1759,16 +1787,16 @@ class TranscriptorMultilingue:
                 duracion = frames / float(rate)
                 
                 info_audio = (f"Información del archivo:\n"
-                             f"- Duración: {int(duracion // 60)}:{int(duracion % 60):02d}\n"
-                             f"- Canales: {canales}\n"
-                             f"- Tasa de muestreo: {tasa} Hz\n"
-                             f"- Tamaño: {os.path.getsize(archivo_audio) / (1024*1024):.2f} MB\n\n")
+                            f"- Duración: {int(duracion // 60)}:{int(duracion % 60):02d}\n"
+                            f"- Canales: {canales}\n"
+                            f"- Tasa de muestreo: {tasa} Hz\n"
+                            f"- Tamaño: {os.path.getsize(archivo_audio) / (1024*1024):.2f} MB\n\n")
                 
                 self.root.after(0, lambda: self.texto_transcripcion.insert(tk.END, info_audio))
                 
                 print(f"Transcribiendo archivo: {os.path.basename(archivo_audio)}, "
-                      f"Duración: {int(duracion // 60)}:{int(duracion % 60):02d}, "
-                      f"Modo: {modo}")
+                    f"Duración: {int(duracion // 60)}:{int(duracion % 60):02d}, "
+                    f"Modo: {modo}")
                 
                 if duracion > 60:
                     self.root.after(0, lambda: self.estado_var.set("Procesando archivo grande por segmentos..."))
@@ -1776,11 +1804,25 @@ class TranscriptorMultilingue:
                 else:
                     self.transcribir_segmento_archivo(archivo_audio, modo)
             
+            # Limpiar el archivo temporal si se creó uno
+            if extension != '.wav' and pydub_disponible and 'temp_wav' in locals():
+                try:
+                    os.unlink(temp_wav)
+                except:
+                    pass
+                
         except Exception as e:
             print(f"Error al procesar archivo: {e}")
             self.root.after(0, lambda: self.estado_var.set(f"Error al procesar archivo: {str(e)}"))
-            messagebox.showerror("Error", f"Error al procesar archivo: {str(e)}")
-    
+            messagebox.showerror("Error", f"Error al procesar archivo: {str(e)}")    
+
+
+
+
+
+
+
+
 
 
 
